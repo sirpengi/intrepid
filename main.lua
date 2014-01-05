@@ -21,7 +21,7 @@ function love.load()
         world[y] = {}
         for x = 1, 25 do
             v = love.math.noise(x, y)
-            if (v < 0.250) then world[y][x] = v end
+            if (v < 0.100) then world[y][x] = v end
         end
     end
 end
@@ -66,9 +66,15 @@ function love.update(dt)
                     or y * tSize >= player.y + tSize
                     or y * tSize + tSize <= player.y)
                 then
-                    print(x * tSize, y * tSize, _x, _y)
-                    player.x = _x
-                    player.y = _y
+                    if key == 'w' then
+                        player.y = (y * tSize) + tSize
+                    elseif key == 's' then
+                        player.y = (y * tSize) - tSize
+                    elseif key == 'a' then
+                        player.x = (x * tSize) + tSize
+                    elseif key == 'd' then
+                        player.x = (x * tSize) - tSize
+                    end
                 end
             end
         end
