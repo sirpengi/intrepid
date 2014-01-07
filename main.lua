@@ -16,6 +16,8 @@ Object = class(
 Camera = class(Object,
 	function(self, ...)
 		Object.init(self, ...)
+		self.w = 800
+		self.h = 600
 	end
 )
 
@@ -23,30 +25,74 @@ Tree = class(Object,
 	function(self, ...)
 		Object.init(self, ...)
 		self.collides = true
-		self.w = 2
-		self.h = 2
+		self.w = 32
+		self.h = 32
 	end
 )
 
 World = class(
 	function(self)
-		self.cellSize = 2
-		self.tiles = {}
-		self.w = 400
-		self.h = 300
+		self.unitSize = 32
+		self.cellWidth = 26
+		self.cellHeight = 20
+		self.cells = {}
+		self.w = 500
+		self.h = 500
 	end
 )
+
+function World:neighbors(a)
+	local result = {}
+	local neighbors = {
+		{x = -1, y = -1},
+		{x = -1, y = 0},
+		{x = -1, y = 1},
+		{x = 0, y = -1},
+		{x = 0, y = 0},
+		{x = 0, y = 1},
+		{x = 1, y = -1},
+		{x = 1, y = 0},
+		{x = 1, y = 1}
+	}
+	for k, v in ipairs(neighbors) do
+		if self.cells[a.y+v.y] and self.cells[a.y+v.y][a.x+v.x] then
+			table.insert(result, self.cells[a.y+v.y][a.x+v.x])
+		end
+	end
+	return result
+end
 
 function World:generate()
 	for y = 1, self.h do
 		for x = 1, self.w do
 			v = octaveNoise(x, y, 6, 0.88, 0.010)
 			if v > 0.500 then
-				o = Tree(x * self.cellSize, y * self.cellSize)
+				o = Tree(x * self.unitSize, y * self.unitSize)
 			end
-			table.insert(self.tiles, o)
+			cy = math.floor(y / self.cellHeight) + 1
+			cx = math.floor(x / self.cellWidth) + 1
+			if not self.cells[cy] then
+				self.cells[cy] = {}
+			end
+			if not self.cells[cy][cx] then
+				self.cells[cy][cx] = {}
+			end
+			if o then
+				table.insert(self.cells[cy][cx], o)
+			end
 		end
 	end
+end
+
+function World:unitToCell(x, y)
+	return {
+		x = math.floor(x / self.cellWidth),
+		y = math.floor(y / self.cellHeight)
+	}
+end
+
+function World:pixelToUnit(x, y)
+
 end
 
 function octaveNoise(x, y, octaves, p, scale)
@@ -73,18 +119,22 @@ end
 function love.load()
 	world = World()
 	world:generate()
+	camera = Camera(0, 0)
 	love.graphics.setBackgroundColor(235, 235, 235)
 	love.graphics.setColor(40, 180, 60)
 end
 
 function love.draw()
-	for i, tile in ipairs(world.tiles) do
-		love.graphics.rectangle("fill",
-			tile.x,
-			tile.y,
-			tile.w,
-			tile.h
-		)
+	local cx = math.floor((camera.x / world.unitSize) / world.cellWidth) + 1
+	local cy = math.floor((camera.y / world.unitSize) / world.cellHeight) + 1
+	local neighbors = world:neighbors({x=cx, y=cy})
+	for k, n in ipairs(neighbors) do
+		for i, tile in ipairs(n) do
+			love.graphics.rectangle("fill",
+				tile.x - camera.x, tile.y - camera.y,
+				tile.w, tile.h
+			)
+		end
 	end
 	love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
 end
@@ -93,6 +143,20 @@ function love.update(dt)
 	if depressed["escape"] then
 		love.event.quit()
 	end
+	if depressed["w"] then
+		camera.y = camera.y -10
+	end
+	if depressed["a"] then
+		camera.x = camera.x - 10
+	end
+	if depressed["s"] then
+		camera.y = camera.y + 10
+	end
+	if depressed["d"] then
+		camera.x = camera.x + 10
+	end
+	if camera.x < 0 then camera.x = 0 end
+	if camera.y < 0 then camera.y = 0 end
 end
 
 function love.run()
