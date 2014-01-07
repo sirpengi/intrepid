@@ -1,160 +1,162 @@
-camera = {x = 0, y = 0}
-player = {x = 200, y = 200}
-rate = 1
-movement = {
-    s = {x = 0, y = rate},
-    w = {x = 0, y = -rate},
-    d = {x = rate, y = 0},
-    a = {x = -rate, y = 0}
-}
+require 'utils.class'
+require 'utils.table2'
+require 'utils.vec2'
+
 depressed = {}
-tSize = 35
-visible = false
-world = {}
+
+Object = class(
+	function(self, x, y, w, h)
+		self.x = x or 0
+		self.y = y or 0
+		self.w = w or 0
+		self.h = h or 0
+	end
+)
+
+Camera = class(Object,
+	function(self, ...)
+		Object.init(self, ...)
+	end
+)
+
+Tree = class(Object,
+	function(self, ...)
+		Object.init(self, ...)
+		self.collides = true
+		self.w = 2
+		self.h = 2
+	end
+)
+
+World = class(
+	function(self)
+		self.cellSize = 2
+		self.tiles = {}
+		self.w = 400
+		self.h = 300
+	end
+)
+
+function World:generate()
+	for y = 1, self.h do
+		for x = 1, self.w do
+			v = octaveNoise(x, y, 6, 0.88, 0.010)
+			if v > 0.500 and v < 1 then
+				o = Tree(x * self.cellSize, y * self.cellSize)
+			end
+			table.insert(self.tiles, o)
+		end
+	end
+end
+
+function octaveNoise(x, y, octaves, p, scale)
+	local total = 0
+	local freq = scale
+	local amp = 1
+	local maxAmp = 0
+
+	for c = 1, octaves do
+		total = total + (love.math.noise(x * freq, y * freq) * amp)
+		freq = freq * 2
+		maxAmp = maxAmp + amp
+		amp = amp * p
+	end
+
+	return total / maxAmp
+end
+
+function intersects(a, b)
+	return (math.abs(a.x - b.x) * 2 < (a.w + b.w))
+		and (math.abs(a.y - b.y) * 2 < (a.h + b.h))
+end
 
 function love.load()
-    -- background
-    love.graphics.setBackgroundColor(255, 255, 255)
-
-    -- generate world
-    for y = 1, 25 do
-        world[y] = {}
-        for x = 1, 25 do
-            v = love.math.noise(x, y)
-            if (v < 0.100) then world[y][x] = v end
-        end
-    end
+	world = World()
+	world:generate()
+	love.graphics.setBackgroundColor(235, 235, 235)
+	love.graphics.setColor(40, 180, 60)
 end
 
 function love.draw()
-    for y in pairs(world) do
-        for x in pairs(world[y]) do
-            love.graphics.setColor(155, 155, 155)
-            love.graphics.rectangle(
-                "fill",
-                x * tSize + camera.x,
-                y * tSize + camera.y,
-                tSize,
-                tSize
-            )
-        end
-    end
-    love.graphics.setColor(50, 75, 100)
-    love.graphics.rectangle(
-        "fill",
-        player.x + camera.x,
-        player.y + camera.y,
-        tSize,
-        tSize
-    )
-    love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+	for i, tile in ipairs(world.tiles) do
+		love.graphics.rectangle("fill",
+			tile.x,
+			tile.y,
+			tile.w,
+			tile.h
+		)
+	end
+	love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
 end
 
 function love.update(dt)
-    for key, value in pairs(depressed) do
-        local _x, _y = player.x, player.y
-
-        if movement[key] then
-            player.x = player.x + movement[key].x
-            player.y = player.y + movement[key].y
-        end
-
-        for y in pairs(world) do
-            for x in pairs(world[y]) do
-                if not (x * tSize >= player.x + tSize
-                    or x * tSize + tSize <= player.x
-                    or y * tSize >= player.y + tSize
-                    or y * tSize + tSize <= player.y)
-                then
-                    if key == 'w' then
-                        player.y = (y * tSize) + tSize
-                    elseif key == 's' then
-                        player.y = (y * tSize) - tSize
-                    elseif key == 'a' then
-                        player.x = (x * tSize) + tSize
-                    elseif key == 'd' then
-                        player.x = (x * tSize) - tSize
-                    end
-                end
-            end
-        end
-    end
-
-    camera.x = -player.x + (love.window.getWidth() / 2)
-    camera.y = -player.y + (love.window.getHeight() / 2)
-end
-
-function love.keypressed(key, unicode)
-    depressed[key] = true
-end
-
-function love.keyreleased(key, unicode)
-    depressed[key] = nil
+	if depressed["escape"] then
+		love.event.quit()
+	end
 end
 
 function love.run()
 
-    if love.math then
-        love.math.setRandomSeed(os.time())
-    end
+	if love.math then
+		love.math.setRandomSeed(os.time())
+	end
 
-    if love.event then
-        love.event.pump()
-    end
+	if love.event then
+		love.event.pump()
+	end
 
-    if love.load then love.load(arg) end
+	if love.load then love.load(arg) end
 
-    -- We don't want the first frame's dt to include time taken by love.load.
-    if love.timer then love.timer.step() end
+	if love.timer then love.timer.step() end
 
-    local dt = 0
-    local updates = 1 / 60
-    local accumulator = 0.0
+	local dt = 0
+	local updates = 1 / 60
+	local accumulator = 0.0
 
-    -- Main loop time.
-    while true do
-        -- Process events.
-        if love.event then
-            love.event.pump()
-            for e,a,b,c,d in love.event.poll() do
-                if e == "quit" then
-                    if not love.quit or not love.quit() then
-                        if love.audio then
-                            love.audio.stop()
-                        end
-                        return
-                    end
-                end
-                love.handlers[e](a,b,c,d)
-            end
-        end
+	while true do
+		if love.event then
+			love.event.pump()
+			for e,a,b,c,d in love.event.poll() do
+				if e == "quit" then
+					if not love.quit or not love.quit() then
+						if love.audio then
+							love.audio.stop()
+						end
+						return
+					end
+				end
+				love.handlers[e](a,b,c,d)
+			end
+		end
 
-        -- Update dt, as we'll be passing it to update
-        if love.timer then
-            love.timer.step()
-            dt = love.timer.getDelta()
-        end
+		if love.timer then
+			love.timer.step()
+			dt = love.timer.getDelta()
+		end
 
-        if dt > 0.25 then
-            dt = 0.25
-        end
+		if dt > 0.25 then
+			dt = 0.25
+		end
 
-        -- Update at fixed rate
-        accumulator = accumulator + dt
-        while accumulator >= updates do
-            if love.update then love.update(dt) end
-            accumulator = accumulator - updates
-        end
+		accumulator = accumulator + dt
+		while accumulator >= updates do
+			if love.update then love.update(dt) end
+			accumulator = accumulator - updates
+		end
 
-        -- Render
-        if love.window and love.graphics and love.window.isCreated() then
-            love.graphics.clear()
-            love.graphics.origin()
-            if love.draw then love.draw() end
-            love.graphics.present()
-        end
+		if love.window and love.graphics and love.window.isCreated() then
+			love.graphics.clear()
+			love.graphics.origin()
+			if love.draw then love.draw() end
+			love.graphics.present()
+		end
+	end
+end
 
-        -- if love.timer then love.timer.sleep(0.001) end
-    end
+function love.keypressed(key, unicode)
+	depressed[key] = true
+end
 
+function love.keyreleased(key, unicode)
+	depressed[key] = false
 end
