@@ -41,7 +41,7 @@ function World:generate()
 	for y = 1, self.h do
 		for x = 1, self.w do
 			v = octaveNoise(x, y, 6, 0.88, 0.010)
-			if v > 0.500 and v < 1 then
+			if v > 0.500 then
 				o = Tree(x * self.cellSize, y * self.cellSize)
 			end
 			table.insert(self.tiles, o)
