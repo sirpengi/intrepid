@@ -16,8 +16,8 @@ Object = class(
 Camera = class(Object,
 	function(self, ...)
 		Object.init(self, ...)
-		self.w = 800
-		self.h = 600
+		self.w = love.window.getWidth()
+		self.h = love.window.getHeight()
 	end
 )
 
@@ -33,65 +33,43 @@ Tree = class(Object,
 World = class(
 	function(self)
 		self.unitSize = 32
-		self.cellWidth = 26
-		self.cellHeight = 20
+		self.tiles = {}
 		self.cells = {}
-		self.w = 500
-		self.h = 500
+		self.w = 200
+		self.h = 200
 	end
 )
 
-function World:neighbors(a)
-	local result = {}
-	local neighbors = {
-		{x = -1, y = -1},
-		{x = -1, y = 0},
-		{x = -1, y = 1},
-		{x = 0, y = -1},
-		{x = 0, y = 0},
-		{x = 0, y = 1},
-		{x = 1, y = -1},
-		{x = 1, y = 0},
-		{x = 1, y = 1}
-	}
-	for k, v in ipairs(neighbors) do
-		if self.cells[a.y+v.y] and self.cells[a.y+v.y][a.x+v.x] then
-			table.insert(result, self.cells[a.y+v.y][a.x+v.x])
-		end
-	end
-	return result
-end
-
 function World:generate()
+	local noise = 0
+	local tile
+	local cw, ch, cx, cy
+
+	cw = math.ceil(800 / self.unitSize)
+	ch = math.ceil(600 / self.unitSize)
+
 	for y = 1, self.h do
+		cy = math.floor(y / ch) + 1
+		ty = y * self.unitSize
+
 		for x = 1, self.w do
-			v = octaveNoise(x, y, 6, 0.88, 0.010)
-			if v > 0.500 then
-				o = Tree(x * self.unitSize, y * self.unitSize)
+			cx = math.floor(x / cw) + 1
+			noise = octaveNoise(x, y, 6, 0.88, 0.010)
+			tx = x * self.unitSize
+
+			if noise > 0.500 then
+				tile = Tree(tx, ty)
 			end
-			cy = math.floor(y / self.cellHeight) + 1
-			cx = math.floor(x / self.cellWidth) + 1
-			if not self.cells[cy] then
-				self.cells[cy] = {}
-			end
-			if not self.cells[cy][cx] then
-				self.cells[cy][cx] = {}
-			end
-			if o then
-				table.insert(self.cells[cy][cx], o)
-			end
+
+			if not self.cells[cy] then self.cells[cy] = {} end
+			if not self.cells[cy][cx] then self.cells[cy][cx] = {} end
+
+			table.insert(self.cells[cy][cx], tile)
 		end
 	end
 end
 
-function World:unitToCell(x, y)
-	return {
-		x = math.floor(x / self.cellWidth),
-		y = math.floor(y / self.cellHeight)
-	}
-end
-
-function World:pixelToUnit(x, y)
+function World:neighbors(x, y)
 
 end
 
@@ -111,12 +89,8 @@ function octaveNoise(x, y, octaves, p, scale)
 	return total / maxAmp
 end
 
-function intersects(a, b)
-	return (math.abs(a.x - b.x) * 2 < (a.w + b.w))
-		and (math.abs(a.y - b.y) * 2 < (a.h + b.h))
-end
-
 function love.load()
+	math.randomseed(1)
 	world = World()
 	world:generate()
 	camera = Camera(0, 0)
@@ -125,18 +99,62 @@ function love.load()
 end
 
 function love.draw()
-	local cx = math.floor((camera.x / world.unitSize) / world.cellWidth) + 1
-	local cy = math.floor((camera.y / world.unitSize) / world.cellHeight) + 1
-	local neighbors = world:neighbors({x=cx, y=cy})
-	for k, n in ipairs(neighbors) do
-		for i, tile in ipairs(n) do
-			love.graphics.rectangle("fill",
-				tile.x - camera.x, tile.y - camera.y,
-				tile.w, tile.h
-			)
+	local count = 0
+
+	--[[ Grid rendering
+	local ax = math.floor(camera.x / world.unitSize)
+	local ay = math.floor(camera.y / world.unitSize)
+	if ax == 0 then ax = 1 end
+	if ay == 0 then ay = 1 end
+
+	local bx = ax + math.ceil(camera.w / world.unitSize)
+	local by = ay + math.ceil(camera.h / world.unitSize)
+	if bx > world.w then
+		bx = world.w
+	end
+	if by > world.h then
+		by = world.h
+	end
+
+	love.graphics.setColor(80, 200, 80)
+	for y = ay, by do
+		for x = ax, bx do
+			local tile = world.tiles[y][x]
+			if tile then
+				love.graphics.rectangle("fill",
+					tile.x - camera.x,
+					tile.y - camera.y,
+					tile.w,
+					tile.h
+				)
+				count = count + 1
+			end
 		end
 	end
+	]]--
+
+	-- Partition rendering
+	local cw, ch, cx, cy
+	cw = math.ceil(800 / world.unitSize)
+	ch = math.ceil(600 / world.unitSize)
+
+	cx = math.floor((camera.x / world.unitSize) / cw) + 1
+	cy = math.floor((camera.y / world.unitSize) / ch) + 1
+
+	love.graphics.setColor(80, 200, 80)
+	for i, t in ipairs(world.cells[cy][cx]) do
+		love.graphics.rectangle("fill",
+			t.x - camera.x,
+			t.y - camera.y,
+			t.w,
+			t.h
+		)
+		count = count + 1
+	end
+
+	love.graphics.setColor(0, 0, 0)
 	love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+	love.graphics.print("Rects: " .. count, 10, 30)
 end
 
 function love.update(dt)
@@ -144,16 +162,16 @@ function love.update(dt)
 		love.event.quit()
 	end
 	if depressed["w"] then
-		camera.y = camera.y -10
+		camera.y = camera.y -1
 	end
 	if depressed["a"] then
-		camera.x = camera.x - 10
+		camera.x = camera.x - 1
 	end
 	if depressed["s"] then
-		camera.y = camera.y + 10
+		camera.y = camera.y + 1
 	end
 	if depressed["d"] then
-		camera.x = camera.x + 10
+		camera.x = camera.x + 1
 	end
 	if camera.x < 0 then camera.x = 0 end
 	if camera.y < 0 then camera.y = 0 end
@@ -204,9 +222,10 @@ function love.run()
 
 		accumulator = accumulator + dt
 		while accumulator >= updates do
-			if love.update then love.update(dt) end
+
 			accumulator = accumulator - updates
 		end
+		if love.update then love.update(dt) end
 
 		if love.window and love.graphics and love.window.isCreated() then
 			love.graphics.clear()
