@@ -4,6 +4,13 @@ require 'utils.vec2'
 
 depressed = {}
 
+Game = class(
+	function(self)
+		self.world = World()
+		self.world:generate()
+	end
+)
+
 Object = class(
 	function(self, x, y, w, h)
 		self.x = x or 0
@@ -14,8 +21,9 @@ Object = class(
 )
 
 Camera = class(Object,
-	function(self, ...)
+	function(self, state, ...)
 		Object.init(self, ...)
+		self.state = state
 		self.w = love.window.getWidth()
 		self.h = love.window.getHeight()
 	end
@@ -43,7 +51,7 @@ World = class(
 function World:generate()
 	local noise = 0
 	local tile
-	local cw, ch, cx, cy
+	local cw, ch, cx, cy, tx, ty
 
 	cw = math.ceil(800 / self.unitSize)
 	ch = math.ceil(600 / self.unitSize)
@@ -91,8 +99,7 @@ end
 
 function love.load()
 	math.randomseed(1)
-	world = World()
-	world:generate()
+	intrepid = Game()
 	camera = Camera(0, 0)
 	love.graphics.setBackgroundColor(235, 235, 235)
 	love.graphics.setColor(40, 180, 60)
@@ -135,21 +142,28 @@ function love.draw()
 
 	-- Partition rendering
 	local cw, ch, cx, cy
-	cw = math.ceil(800 / world.unitSize)
-	ch = math.ceil(600 / world.unitSize)
+	cw = math.ceil(800 / intrepid.world.unitSize)
+	ch = math.ceil(600 / intrepid.world.unitSize)
 
-	cx = math.floor((camera.x / world.unitSize) / cw) + 1
-	cy = math.floor((camera.y / world.unitSize) / ch) + 1
+	cx = math.floor((camera.x / intrepid.world.unitSize) / cw) + 1
+	cy = math.floor((camera.y / intrepid.world.unitSize) / ch) + 1
 
 	love.graphics.setColor(80, 200, 80)
-	for i, t in ipairs(world.cells[cy][cx]) do
-		love.graphics.rectangle("fill",
-			t.x - camera.x,
-			t.y - camera.y,
-			t.w,
-			t.h
-		)
-		count = count + 1
+	for i, t in ipairs(intrepid.world.cells[cy][cx]) do
+		if t.x > camera.x 
+			and t.y > camera.y 
+			and t.x < camera.x + camera.w 
+			and t.y < camera.y + camera.h then
+
+			love.graphics.rectangle("fill",
+				t.x - camera.x,
+				t.y - camera.y,
+				t.w,
+				t.h
+			)
+
+			count = count + 1
+		end
 	end
 
 	love.graphics.setColor(0, 0, 0)
