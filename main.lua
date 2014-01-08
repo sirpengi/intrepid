@@ -4,19 +4,27 @@ require 'utils.vec2'
 
 depressed = {}
 
-Game = class(
-	function(self)
-		self.world = World()
-		self.world:generate()
-	end
-)
-
 Object = class(
 	function(self, x, y, w, h)
 		self.x = x or 0
 		self.y = y or 0
 		self.w = w or 0
 		self.h = h or 0
+	end
+)
+
+Actor = class(Object,
+	function(self, ...)
+		Object.init(self, ...)
+		self.collides = true
+	end
+)
+
+Player = class(Actor,
+	function(self, ...)
+		Actor.init(self, ...)
+		self.w = 30
+		self.h = 30
 	end
 )
 
@@ -45,6 +53,15 @@ World = class(
 		self.cells = {}
 		self.w = 200
 		self.h = 200
+	end
+)
+
+Game = class(
+	function(self)
+		self.world = World()
+		self.world:generate()
+
+		self.player = Player(500, 500)
 	end
 )
 
@@ -150,9 +167,9 @@ function love.draw()
 
 	love.graphics.setColor(80, 200, 80)
 	for i, t in ipairs(intrepid.world.cells[cy][cx]) do
-		if t.x > camera.x 
-			and t.y > camera.y 
-			and t.x < camera.x + camera.w 
+		if t.x > camera.x
+			and t.y > camera.y
+			and t.x < camera.x + camera.w
 			and t.y < camera.y + camera.h then
 
 			love.graphics.rectangle("fill",
@@ -166,27 +183,44 @@ function love.draw()
 		end
 	end
 
+	love.graphics.setColor(60, 60, 180)
+	love.graphics.rectangle("fill",
+		intrepid.player.x - camera.x,
+		intrepid.player.y - camera.y,
+		intrepid.player.w,
+		intrepid.player.h
+	)
+
 	love.graphics.setColor(0, 0, 0)
 	love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
 	love.graphics.print("Rects: " .. count, 10, 30)
 end
 
 function love.update(dt)
+	player = intrepid.player
 	if depressed["escape"] then
 		love.event.quit()
 	end
+
 	if depressed["w"] then
-		camera.y = camera.y -1
+		player.y = player.y -1
 	end
 	if depressed["a"] then
-		camera.x = camera.x - 1
+		player.x = player.x - 1
 	end
 	if depressed["s"] then
-		camera.y = camera.y + 1
+		player.y = player.y + 1
 	end
 	if depressed["d"] then
-		camera.x = camera.x + 1
+		player.x = player.x + 1
 	end
+
+	if player.x < 0 then player.x = 0 end
+	if player.y < 0 then player.y = 0 end
+
+	camera.x = player.x - (love.window.getWidth() / 2)
+	camera.y = player.y - (love.window.getHeight() / 2)
+
 	if camera.x < 0 then camera.x = 0 end
 	if camera.y < 0 then camera.y = 0 end
 end
@@ -236,9 +270,9 @@ function love.run()
 
 		accumulator = accumulator + dt
 		while accumulator >= updates do
-
 			accumulator = accumulator - updates
 		end
+
 		if love.update then love.update(dt) end
 
 		if love.window and love.graphics and love.window.isCreated() then
