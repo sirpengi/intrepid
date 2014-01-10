@@ -47,7 +47,7 @@ Tree = class(Object,
 
 World = class(
 	function(self)
-		self.unitSize = 64
+		self.unitSize = 128
 		self.tiles = {}
 
 		self.cells = {}
@@ -57,14 +57,13 @@ World = class(
 	end
 )
 
-Game = class(
-	function(self)
-		self.world = World()
-		self.world:generate()
+function World:cell(vector)
+	cellWidth = math.ceil(800 / self.unitSize)
+	cellHeight = math.ceil(600 / self.unitSize)
 
-		self.player = Player(500, 500)
-	end
-)
+	cellX = math.floor((camera.x / self.unitSize) / cellWidth) + 1
+	cellY = math.floor((camera.y / self.unitSize) / cellHeight) + 1
+end
 
 function World:generate()
 	local noise = 0
@@ -98,6 +97,15 @@ function World:generate()
 		end
 	end
 end
+
+Game = class(
+	function(self)
+		self.world = World()
+		self.world:generate()
+
+		self.player = Player(500, 500)
+	end
+)
 
 function intersects(a, b)
 	return not (b.x >= (a.x + a.w)
@@ -238,9 +246,11 @@ function love.update(dt)
 		d = {x=1,y=0}
 	}
 
-	for k in pairs(depressed) do
-		player.x = player.x + vectors[k].x
-		player.y = player.y + vectors[k].y
+	for key in pairs(depressed) do
+		if not vectors[key] then break end
+
+		player.x = player.x + vectors[key].x
+		player.y = player.y + vectors[key].y
 
 		local neighbors = {
 			{x =1,y =1},
@@ -275,16 +285,16 @@ function love.update(dt)
 						and t.y < camera.y + camera.h
 						and intersects(player, t)
 					then
-						if k == "w" then
+						if key == "w" then
 							player.y = t.y + t.h
 						end
-						if k == "a" then
+						if key == "a" then
 							player.x = t.x + t.w
 						end
-						if k == "s" then
+						if key == "s" then
 							player.y = t.y - player.h
 						end
-						if k == "d" then
+						if key == "d" then
 							player.x = t.x - player.w
 						end
 					end
