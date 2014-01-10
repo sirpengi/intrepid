@@ -1,6 +1,5 @@
 require 'utils.class'
 require 'utils.table2'
-require 'utils.vec2'
 
 depressed = {}
 
@@ -48,9 +47,11 @@ Tree = class(Object,
 
 World = class(
 	function(self)
-		self.unitSize = 32
+		self.unitSize = 64
 		self.tiles = {}
+
 		self.cells = {}
+
 		self.w = 200
 		self.h = 200
 	end
@@ -69,21 +70,25 @@ function World:generate()
 	local noise = 0
 	local tile
 	local cw, ch, cx, cy, tx, ty
+	local us = self.unitSize
 
-	cw = math.ceil(800 / self.unitSize)
-	ch = math.ceil(600 / self.unitSize)
+	cw = math.ceil(800 / us)
+	ch = math.ceil(600 / us)
 
 	for y = 1, self.h do
 		cy = math.floor(y / ch) + 1
-		ty = y * self.unitSize
+		ty = y * us
 
 		for x = 1, self.w do
 			cx = math.floor(x / cw) + 1
 			noise = octaveNoise(x, y, 6, 0.88, 0.010)
-			tx = x * self.unitSize
+			tx = x * us
 
 			if noise > 0.500 then
-				tile = Tree(tx, ty)
+				tile = Tree(
+					tx + math.random(1, us * 0.75),
+					ty + math.random(1, us * 0.75)
+				)
 			end
 
 			if not self.cells[cy] then self.cells[cy] = {} end
@@ -94,8 +99,11 @@ function World:generate()
 	end
 end
 
-function World:neighbors(x, y)
-
+function intersects(a, b)
+	return not (b.x >= (a.x + a.w)
+		or (b.x + b.w <= a.x)
+		or (b.y >= a.y + a.h)
+		or (b.y + b.h <= a.y))
 end
 
 function octaveNoise(x, y, octaves, p, scale)
@@ -118,7 +126,7 @@ function love.load()
 	math.randomseed(1)
 	intrepid = Game()
 	camera = Camera(0, 0)
-	love.graphics.setBackgroundColor(235, 235, 235)
+	love.graphics.setBackgroundColor(250, 250, 250)
 	love.graphics.setColor(40, 180, 60)
 end
 
@@ -158,28 +166,49 @@ function love.draw()
 	]]--
 
 	-- Partition rendering
-	local cw, ch, cx, cy
-	cw = math.ceil(800 / intrepid.world.unitSize)
-	ch = math.ceil(600 / intrepid.world.unitSize)
+	local neighbors = {
+		{x =1,y =1},
+		{x=0,y =1},
+		{x=1,y=1},
+		{x=1,y=0},
+		{x=1,y=1},
+		{x=0,y=1},
+		{x=1,y =1},
+		{x=0,y=-1},
+		{x=0,y=0}
+	}
 
-	cx = math.floor((camera.x / intrepid.world.unitSize) / cw) + 1
-	cy = math.floor((camera.y / intrepid.world.unitSize) / ch) + 1
+	local cellWidth, cellHeight, cellX, cellY, neighborX, neighborY
+	local world = intrepid.world
+	local cells = world.cells
+
+	cellWidth = math.ceil(800 / world.unitSize)
+	cellHeight = math.ceil(600 / world.unitSize)
+
+	cellX = math.floor((camera.x / world.unitSize) / cellWidth) + 1
+	cellY = math.floor((camera.y / world.unitSize) / cellHeight) + 1
 
 	love.graphics.setColor(80, 200, 80)
-	for i, t in ipairs(intrepid.world.cells[cy][cx]) do
-		if t.x > camera.x
-			and t.y > camera.y
-			and t.x < camera.x + camera.w
-			and t.y < camera.y + camera.h then
+	for k, of in ipairs(neighbors) do
+		neighborX = cellX + of.x
+		neighborY = cellY + of.y
+		if cells[neighborY] and cells[neighborY][neighborX] then
 
-			love.graphics.rectangle("fill",
-				t.x - camera.x,
-				t.y - camera.y,
-				t.w,
-				t.h
-			)
-
-			count = count + 1
+			for i, t in ipairs(cells[neighborY][neighborX]) do
+				if t.x > camera.x
+					and t.y > camera.y
+					and t.x < camera.x + camera.w
+					and t.y < camera.y + camera.h
+				then
+					love.graphics.rectangle("fill",
+						t.x - camera.x,
+						t.y - camera.y,
+						t.w,
+						t.h
+					)
+					count = count + 1
+				end
+			end
 		end
 	end
 
@@ -197,26 +226,72 @@ function love.draw()
 end
 
 function love.update(dt)
-	player = intrepid.player
+	local player = intrepid.player
 	if depressed["escape"] then
 		love.event.quit()
 	end
 
-	if depressed["w"] then
-		player.y = player.y -1
-	end
-	if depressed["a"] then
-		player.x = player.x - 1
-	end
-	if depressed["s"] then
-		player.y = player.y + 1
-	end
-	if depressed["d"] then
-		player.x = player.x + 1
-	end
+	local vectors = {
+		w = {x=0,y=-1},
+		a = {x=-1,y=0},
+		s = {x=0,y=1},
+		d = {x=1,y=0}
+	}
 
-	if player.x < 0 then player.x = 0 end
-	if player.y < 0 then player.y = 0 end
+	for k in pairs(depressed) do
+		player.x = player.x + vectors[k].x
+		player.y = player.y + vectors[k].y
+
+		local neighbors = {
+			{x =1,y =1},
+			{x=0,y =1},
+			{x=1,y=1},
+			{x=1,y=0},
+			{x=1,y=1},
+			{x=0,y=1},
+			{x=1,y =1},
+			{x=0,y=-1},
+			{x=0,y=0}
+		}
+
+		local cw, ch, cx, cy, nx, ny
+		local world = intrepid.world
+		local cells = world.cells
+
+		cw = math.ceil(800 / world.unitSize)
+		ch = math.ceil(600 / world.unitSize)
+
+		cx = math.floor((camera.x / world.unitSize) / cw) + 1
+		cy = math.floor((camera.y / world.unitSize) / ch) + 1
+
+		for i, of in ipairs(neighbors) do
+			nx = cx + of.x
+			ny = cy + of.y
+			if cells[ny] and cells[ny][nx] then
+				for i, t in ipairs(cells[ny][nx]) do
+					if t.x > camera.x
+						and t.y > camera.y
+						and t.x < camera.x + camera.w
+						and t.y < camera.y + camera.h
+						and intersects(player, t)
+					then
+						if k == "w" then
+							player.y = t.y + t.h
+						end
+						if k == "a" then
+							player.x = t.x + t.w
+						end
+						if k == "s" then
+							player.y = t.y - player.h
+						end
+						if k == "d" then
+							player.x = t.x - player.w
+						end
+					end
+				end
+			end
+		end
+	end
 
 	camera.x = player.x - (love.window.getWidth() / 2)
 	camera.y = player.y - (love.window.getHeight() / 2)
@@ -289,5 +364,5 @@ function love.keypressed(key, unicode)
 end
 
 function love.keyreleased(key, unicode)
-	depressed[key] = false
+	depressed[key] = nil
 end
