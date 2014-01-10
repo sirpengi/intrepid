@@ -57,14 +57,6 @@ World = class(
 	end
 )
 
-function World:cell(vector)
-	cellWidth = math.ceil(800 / self.unitSize)
-	cellHeight = math.ceil(600 / self.unitSize)
-
-	cellX = math.floor((camera.x / self.unitSize) / cellWidth) + 1
-	cellY = math.floor((camera.y / self.unitSize) / cellHeight) + 1
-end
-
 function World:generate()
 	local noise = 0
 	local tile
@@ -355,10 +347,9 @@ function love.run()
 
 		accumulator = accumulator + dt
 		while accumulator >= updates do
+			if love.update then love.update(dt) end
 			accumulator = accumulator - updates
 		end
-
-		if love.update then love.update(dt) end
 
 		if love.window and love.graphics and love.window.isCreated() then
 			love.graphics.clear()
