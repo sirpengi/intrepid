@@ -48,6 +48,13 @@ Camera = class(Object,
 	end
 )
 
+function Camera:isVisible(x, y, w, h)
+	return self.x < x + w
+		and self.y < y + h
+		and self.x + self.w > x
+		and self.y + self.h > y
+end
+
 function Camera:set(x, y)
 	self.x = math.max(0, x)
 	self.y = math.max(0, y)
@@ -145,13 +152,15 @@ function love.draw()
 	love.graphics.setColor(20, 70, 20)
 	tiles = world.objects:contents(camera.x, camera.y, 1)
 	for i, t in ipairs(tiles) do
-		love.graphics.rectangle("fill",
-			t.x - camera.x,
-			t.y - camera.y,
-			t.w,
-			t.h
-		)
-		count = count + 1
+		if camera:isVisible(t.x, t.y, t.w, t.h) then
+			love.graphics.rectangle("fill",
+				t.x - camera.x,
+				t.y - camera.y,
+				t.w,
+				t.h
+			)
+			count = count + 1
+		end
 	end
 
 	love.graphics.setColor(90, 90, 90)
@@ -163,7 +172,8 @@ function love.draw()
 	)
 
 	love.graphics.print("FPS " .. love.timer.getFPS(), 10, 10)
-	love.graphics.print("Tiles in buckets " .. #tiles, 10, 30)
+	love.graphics.print("Rectangles drawn  " .. count, 10, 30)
+	love.graphics.print("Tiles in buckets " .. #tiles, 10, 50)
 end
 
 function love.update(dt)
@@ -183,7 +193,29 @@ function love.update(dt)
 		if not vectors[key] then
 			break
 		end
+
 		player:push(vectors[key].x, vectors[key].y)
+
+		-- collision
+		nearby = world.objects:contents(player.x, player.y, 1)
+		for i, t in ipairs(nearby) do
+			if camera:isVisible(t.x, t.y, t.w, t.h)
+				and intersects(player, t)
+			then
+				if key == "w" then
+					player.y = t.y + t.h
+				end
+				if key == "a" then
+					player.x = t.x + t.w
+				end
+				if key == "s" then
+					player.y = t.y - player.h
+				end
+				if key == "d" then
+					player.x = t.x - player.w
+				end
+			end
+		end
 	end
 
 	camera:center(player.x, player.y, player.w, player.h)
