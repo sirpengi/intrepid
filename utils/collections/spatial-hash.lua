@@ -9,7 +9,7 @@ SpatialHash = class(
 )
 
 function SpatialHash:_set(c, r, v)
-	assert(c > 0 or r > 0, "Index less than 1")
+	assert(c > 0 and r > 0, "Index less than 1")
 	self:_expand(c, r)
 	table.insert(self.buckets[c][r], v)
 end
