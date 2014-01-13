@@ -55,18 +55,14 @@ function SpatialHash:hash(x, y, v)
 	return c, r
 end
 
-function SpatialHash:bucket(x, y)
-	local c, r = self:hash(x, y)
-	if self.buckets[c] and self.buckets[c][r] then
-		return self.buckets[c][r]
-	end
-	return nil
-end
-
-function SpatialHash:contents(x, y, radius)
+function SpatialHash:items(x, y, radius)
 	local items = {}
 	local c, r = self:hash(x, y)
 	local nc, nr
+
+	if not radius and self.buckets[c] and self.buckets[c][r] then
+		return self.buckets[c][r]
+	end
 
 	for a = -radius, radius do
 		nc = c + a
@@ -84,7 +80,7 @@ function SpatialHash:contents(x, y, radius)
 end
 
 function SpatialHash:clear()
-	self:init(self.getWidth(), self.getHeight())
+	self:init(self:getWidth(), self:getHeight())
 end
 
 function SpatialHash:getWidth()

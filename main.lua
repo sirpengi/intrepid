@@ -1,24 +1,55 @@
 require 'utils.class'
-require 'utils.table2'
 require 'utils.collections.spatial-hash'
 
-depressed = {}
+UNIT_SIZE = 32
+DEPRESSED = {}
+
+function intersects(a, b)
+	return not (b.x >= (a.x + a.w)
+		or (b.x + b.w <= a.x)
+		or (b.y >= a.y + a.h)
+		or (b.y + b.h <= a.y))
+end
+
+function noise(x, y, octaves, persistence, scale)
+	local total = 0
+	local freq = scale
+	local amp = 1
+	local maxAmp = 0
+
+	for c = 1, octaves do
+		total = total + (love.math.noise(x * freq, y * freq) * amp)
+		freq = freq * 2
+		maxAmp = maxAmp + amp
+		amp = amp * persistence
+	end
+
+	return total / maxAmp
+end
 
 Object = class(
 	function(self, x, y, w, h)
 		self.x = x or 0
 		self.y = y or 0
-		self.w = w or 0
-		self.h = h or 0
+		self.w = w or UNIT_SIZE
+		self.h = h or UNIT_SIZE
+		self.color = {255, 0, 255}
+	end
+)
+
+Tree = class(Object,
+	function(self, ...)
+		Object.init(self, ...)
+		self.w = UNIT_SIZE
+		self.h = UNIT_SIZE
+		self.color = {150, 150, 150}
+		self.collides = true
 	end
 )
 
 Actor = class(Object,
 	function(self, ...)
 		Object.init(self, ...)
-		self.collides = true
-		self.lastX = 0
-		self.lastY = 0
 	end
 )
 
@@ -35,8 +66,9 @@ end
 Player = class(Actor,
 	function(self, ...)
 		Actor.init(self, ...)
-		self.w = 32
-		self.h = 32
+		self.color = {60, 60, 60}
+		self.w = UNIT_SIZE * 0.80
+		self.h = UNIT_SIZE * 0.80
 	end
 )
 
@@ -66,21 +98,12 @@ function Camera:center(x, y, w, h)
 	self:set(cx, cy)
 end
 
-Tree = class(Object,
-	function(self, ...)
-		Object.init(self, ...)
-		self.collides = true
-		self.w = 32
-		self.h = 32
-	end
-)
-
 World = class(
 	function(self)
-		self.unitSize = 32
+		UNIT_SIZE = UNIT_SIZE
 		self.objects = SpatialHash(800)
 		self.w = 400
-		self.h = 200
+		self.h = 400
 	end
 )
 
@@ -88,16 +111,27 @@ function World:generate()
 	local n = 0
 	local t = nil
 	local x, y = 0
-	for c = 1, self.h do
-		y = c * self.unitSize
-		for r = 1, self.w do
-			x = r * self.unitSize
-			n = octaveNoise(c, r, 6, 0.88, 0.010)
-			if n > 0.500 then
-				t = Tree(x, y)
+	for c = 1, self.h, 2 do
+		for r = 1, self.w, 2 do
+
+			-- determine tree density
+			n = noise(c, r, 5, 0.5, 0.006)
+			if n < 1 and n > 0.75 then
+				p = 1
+			elseif n < 0.75 and n > 0.6 then
+				p = 0.45
+			elseif n < 0.6 and n > 0.5 then
+				p = 0.25
+			else
+				p = 0
 			end
-			self.objects:hash(x, y, t)
-			t = nil
+
+			if love.math.random() < p then
+				y = (c * UNIT_SIZE) + love.math.random(0, UNIT_SIZE)
+				x = (r * UNIT_SIZE) + love.math.random(0, UNIT_SIZE)
+				t = Tree(x, y)
+				self.objects:hash(x, y, t)
+			end
 		end
 	end
 end
@@ -109,34 +143,12 @@ Game = class(
 	end
 )
 
-function intersects(a, b)
-	return not (b.x >= (a.x + a.w)
-		or (b.x + b.w <= a.x)
-		or (b.y >= a.y + a.h)
-		or (b.y + b.h <= a.y))
-end
-
-function octaveNoise(x, y, octaves, p, scale)
-	local total = 0
-	local freq = scale
-	local amp = 1
-	local maxAmp = 0
-
-	for c = 1, octaves do
-		total = total + (love.math.noise(x * freq, y * freq) * amp)
-		freq = freq * 2
-		maxAmp = maxAmp + amp
-		amp = amp * p
-	end
-
-	return total / maxAmp
-end
-
 function love.load()
+	tree = love.graphics.newImage("tree.png")
 	love.graphics.setBackgroundColor(240, 240, 240)
 
 	camera = Camera(0, 0)
-	player = Player(400, 400)
+	player = Player(0, 0)
 	world = World()
 	world:generate()
 
@@ -147,23 +159,25 @@ end
 
 function love.draw()
 	local count = 0
-	local tiles = {}
 
-	love.graphics.setColor(20, 70, 20)
-	tiles = world.objects:contents(camera.x, camera.y, 1)
+	tiles = world.objects:items(player.x, player.y, 1)
 	for i, t in ipairs(tiles) do
-		if camera:isVisible(t.x, t.y, t.w, t.h) then
-			love.graphics.rectangle("fill",
+		if camera:isVisible(t.x, t.y, 60, 125) then
+			love.graphics.setColor(unpack(t.color))
+			love.graphics.draw(
+				tree,
 				t.x - camera.x,
 				t.y - camera.y,
-				t.w,
-				t.h
+				0,
+				1, 1,
+				21,
+				82
 			)
 			count = count + 1
 		end
 	end
 
-	love.graphics.setColor(90, 90, 90)
+	love.graphics.setColor(unpack(player.color))
 	love.graphics.rectangle("fill",
 		player.x - camera.x,
 		player.y - camera.y,
@@ -171,6 +185,7 @@ function love.draw()
 		player.h
 	)
 
+	love.graphics.setColor(0, 0, 0)
 	love.graphics.print("FPS " .. love.timer.getFPS(), 10, 10)
 	love.graphics.print("Rectangles drawn  " .. count, 10, 30)
 	love.graphics.print("Tiles in buckets " .. #tiles, 10, 50)
@@ -178,18 +193,19 @@ end
 
 function love.update(dt)
 	local player = intrepid.player
-	if depressed["escape"] then
+
+	if DEPRESSED["escape"] then
 		love.event.quit()
 	end
 
 	local vectors = {
-		w = {x=0,y=-1},
-		a = {x=-1,y=0},
-		s = {x=0,y=1},
-		d = {x=1,y=0}
+		w = {x=0,y=-5},
+		a = {x=-5,y=0},
+		s = {x=0,y=5},
+		d = {x=5,y=0}
 	}
 
-	for key in pairs(depressed) do
+	for key in pairs(DEPRESSED) do
 		if not vectors[key] then
 			break
 		end
@@ -197,10 +213,11 @@ function love.update(dt)
 		player:push(vectors[key].x, vectors[key].y)
 
 		-- collision
-		nearby = world.objects:contents(player.x, player.y, 1)
+		nearby = world.objects:items(player.x, player.y, 1)
 		for i, t in ipairs(nearby) do
 			if camera:isVisible(t.x, t.y, t.w, t.h)
 				and intersects(player, t)
+				and t.collides
 			then
 				if key == "w" then
 					player.y = t.y + t.h
@@ -280,9 +297,9 @@ function love.run()
 end
 
 function love.keypressed(key, unicode)
-	depressed[key] = true
+	DEPRESSED[key] = true
 end
 
 function love.keyreleased(key, unicode)
-	depressed[key] = nil
+	DEPRESSED[key] = nil
 end
