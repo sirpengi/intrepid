@@ -111,8 +111,8 @@ function World:generate()
 	local n = 0
 	local t = nil
 	local x, y = 0
-	for c = 1, self.h, 2 do
-		for r = 1, self.w, 2 do
+	for c = 1, self.h, 3 do
+		for r = 1, self.w, 3 do
 
 			-- determine tree density
 			n = noise(c, r, 5, 0.5, 0.006)
@@ -127,8 +127,8 @@ function World:generate()
 			end
 
 			if love.math.random() < p then
-				y = (c * UNIT_SIZE) + love.math.random(0, UNIT_SIZE)
-				x = (r * UNIT_SIZE) + love.math.random(0, UNIT_SIZE)
+				y = (c * UNIT_SIZE) + love.math.random(0, UNIT_SIZE * 2)
+				x = (r * UNIT_SIZE) + love.math.random(0, UNIT_SIZE * 2)
 				t = Tree(x, y)
 				self.objects:hash(x, y, t)
 			end
@@ -145,6 +145,7 @@ Game = class(
 
 function love.load()
 	tree = love.graphics.newImage("tree.png")
+	snow = love.graphics.newImage("snow.jpg")
 	love.graphics.setBackgroundColor(240, 240, 240)
 
 	camera = Camera(0, 0)
@@ -160,23 +161,6 @@ end
 function love.draw()
 	local count = 0
 
-	tiles = world.objects:items(player.x, player.y, 1)
-	for i, t in ipairs(tiles) do
-		if camera:isVisible(t.x, t.y, 60, 125) then
-			love.graphics.setColor(unpack(t.color))
-			love.graphics.draw(
-				tree,
-				t.x - camera.x,
-				t.y - camera.y,
-				0,
-				1, 1,
-				21,
-				82
-			)
-			count = count + 1
-		end
-	end
-
 	love.graphics.setColor(unpack(player.color))
 	love.graphics.rectangle("fill",
 		player.x - camera.x,
@@ -185,10 +169,29 @@ function love.draw()
 		player.h
 	)
 
+
+	love.graphics.setColor(160, 160, 160)
+	tiles = world.objects:items(player.x, player.y, 1)
+	for i, t in ipairs(tiles) do
+		if camera:isVisible(t.x, t.y, 60, 125) then
+			love.graphics.draw(
+				tree,
+				t.x - camera.x,
+				t.y - camera.y,
+				0,
+				1.5,
+				1.8,
+				21,
+				82
+			)
+			count = count + 1
+		end
+	end
+
 	love.graphics.setColor(0, 0, 0)
-	love.graphics.print("FPS " .. love.timer.getFPS(), 10, 10)
-	love.graphics.print("Rectangles drawn  " .. count, 10, 30)
-	love.graphics.print("Tiles in buckets " .. #tiles, 10, 50)
+	love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
+	love.graphics.print("Objects drawn:  " .. count, 10, 30)
+	love.graphics.print("Objects in buckets: " .. #tiles, 10, 50)
 end
 
 function love.update(dt)
