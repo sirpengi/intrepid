@@ -146,6 +146,7 @@ Game = class(
 function love.load()
 	tree = love.graphics.newImage("tree.png")
 	love.graphics.setBackgroundColor(240, 240, 240)
+	spriteBatch = love.graphics.newSpriteBatch(tree, 200)
 
 	camera = Camera(0, 0)
 	player = Player(0, 0)
@@ -161,11 +162,11 @@ function love.draw()
 	local count = 0
 
 	tiles = world.objects:items(player.x, player.y, 1)
+	
+	spriteBatch:clear()
 	for i, t in ipairs(tiles) do
 		if camera:isVisible(t.x, t.y, 60, 125) then
-			love.graphics.setColor(unpack(t.color))
-			love.graphics.draw(
-				tree,
+			spriteBatch:add(
 				t.x - camera.x,
 				t.y - camera.y,
 				0,
@@ -176,6 +177,9 @@ function love.draw()
 			count = count + 1
 		end
 	end
+
+	love.graphics.setColor(255, 255, 255, 255)
+	love.graphics.draw(spriteBatch)
 
 	love.graphics.setColor(unpack(player.color))
 	love.graphics.rectangle("fill",
